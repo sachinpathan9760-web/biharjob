@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pariksha Quiz (Hindi)</title>
+  <style>
+    body { font-family: "Noto Sans", Arial, sans-serif; margin:0; padding:20px; background:#f3f6fb; color:#0f172a; }
+    .container { max-width:800px; margin:0 auto; background:#fff; padding:22px; border-radius:12px; box-shadow:0 6px 20px rgba(16,24,40,0.06); }
+    h1 { margin:0 0 8px 0; font-size:26px; }
+    .meta { color:#475569; margin-bottom:16px; }
+    .question { font-size:20px; margin:18px 0; }
+    .options { list-style:none; padding:0; margin:0; }
+    .option { padding:12px 14px; margin-bottom:10px; border-radius:10px; border:1px solid #e6eef8; cursor:pointer; background:#f8fafc; transition:all .15s ease; }
+    .option:hover { transform:translateY(-2px); }
+    .option.disabled { cursor:default; opacity:0.85; }
+    .option.correct { background: #dcfce7; border-color:#86efac; color:#064e3b; }
+    .option.wrong { background:#fee2e2; border-color:#f87171; color:#7f1d1d; }
+    .answer-box { margin-top:14px; padding:12px; border-left:4px solid #0ea5e9; background:#f1faff; border-radius:8px; display:none; }
+    .controls { display:flex; gap:8px; margin-top:16px; }
+    .btn { padding:8px 12px; border-radius:8px; border:1px solid #0ea5e9; background:white; cursor:pointer; }
+    .btn:disabled { opacity:0.6; cursor:default; }
+    .small { font-size:13px; color:#64748b; margin-top:10px; }
+    footer { margin-top:18px; font-size:13px; color:#94a3b8; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Pariksha Quiz — Bihar Exams</h1>
+    <div class="meta">प्रश्न पढ़ें, सही विकल्प पर क्लिक करें। गलत विकल्प लाल और सही हरा दिखेगा। नीचे पूरा उत्तर दिखेगा।</div>
+
+    <div id="quiz-area">
+      <div id="q-number" class="small"></div>
+      <div id="question" class="question">लोड हो रहा है…</div>
+
+      <ul id="options" class="options"></ul>
+
+      <div id="answer" class="answer-box"></div>
+
+      <div class="controls">
+        <button id="prev" class="btn">पिछला</button>
+        <button id="next" class="btn">अगला</button>
+        <button id="show-all" class="btn">सभी प्रश्न संपादित करें (admin)</button>
+      </div>
+    </div>
+
+    <div class="small">Tip: प्रश्न जोड़ने के लिए repo में <code>questions.json</code> फाइल को edit करें।</div>
+
+    <footer>© <span id="year"></span> · आपकी परीक्षा वेबसाइट</footer>
+  </div>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    // questions.json फाइल से डेटा लोड करेगा (आप GitHub repo में ये फाइल बनायें)
+    const QUESTIONS_URL = './questions.json';
+
+    let questions = [];
+    let idx = 0;
+    let answered = false;
+
+    async function loadQuestions() {
+      try {
+        const res = await fetch(QUESTIONS_URL + '?t=' + Date.now());
+        if(!res.ok) throw new Error('Failed to load questions.json');
+        questions = await res.json();
+        if(!Array.isArray(questions) || questions.length === 0) {
+          showMessage('questions.json खाली है या गलत format है।');
+          return;
+        }
+        idx = 0;
+        renderQuestion();
+      } catch (err) {
+        showMessage('प्रश्न लोड नहीं हो पाए: ' + err.message);
+      }
+    }
+
+    function showMessage(text) {
+      document.getElementById('question').textContent = text;
+      document.getElementById('options').innerHTML = '';
+      document.getElementById('answer').style.display = 'none';
+    }
+
+    function renderQuestion() {
+      const q = questions[idx];
+      document.getElementById('q-number').textContent = `प्रश्न ${idx+1} / ${questions.length}`;
+      document.getElementById('question').textContent = q.question;
+      const optList = document.getElementById('options');
+      optList.innerHTML = '';
+      document.getElementById('answer').style.display = 'none';
+      answered = false;
+
+      q.options.forEach((o, i) => {
+        const li = document.createElement('li');
+        li.className = 'option';
+        li.textContent = o;
+        li.dataset.index = i;
+        li.addEventListener('click', () => onOptionClick(li, i));
+        optList.appendChild(li);
+      });
+
+      // buttons
+      document.getElementById('prev').disabled = (idx === 0);
+      document.getElementById('next').disabled = (idx === questions.length - 1);
+    }
+
+    function onOptionClick(li, clickedIndex) {
+      if(answered) return;
+      const q = questions[idx];
+      const correctIndex = q.correct; // number (0-based)
+      answered = true;
+
+      // mark options
+      document.querySelectorAll('.option').forEach(el => {
+        el.classList.add('disabled');
+        const i = Number(el.dataset.index);
+        if(i === correctIndex) el.classList.add('correct');
+        if(i === clickedIndex && i !== correctIndex) el.classList.add('wrong');
+      });
+
+      // show answer text
+      const ansBox = document.getElementById('answer');
+      ansBox.innerHTML = `<strong>उत्तर:</strong> ${q.answer || 'उत्तर उपलब्ध नहीं है।'}`;
+      ansBox.style.display = 'block';
+    }
+
+    document.getElementById('prev').addEventListener('click', () => {
+      if(idx > 0) { idx--; renderQuestion(); }
+    });
+    document.getElementById('next').addEventListener('click', () => {
+      if(idx < questions.length - 1) { idx++; renderQuestion(); }
+    });
+    document.getElementById('show-all').addEventListener('click', () => {
+      // shortcut: open repo edit page (user can change to their repo url)
+      const repoEdit = location.origin + location.pathname.replace(/\/[^\/]*$/, '/'); 
+      window.open(repoEdit, '_blank');
+    });
+
+    // शुरू करें
+    loadQuestions();
+  </script>
+</body>
+</html>
